@@ -1,11 +1,14 @@
-import os
 import json
-from functools import lru_cache
-from .unit import BaseUnit, Unit
 import logging
-from typing import Optional, Any, Union
-import pintless.quantity
+import os
+from copy import deepcopy
+from functools import lru_cache
+from typing import Any, Optional, Union
+
 import pintless.errors as errors
+import pintless.quantity
+
+from .unit import BaseUnit, Unit
 
 DEFAULT_DEFINITION_FILE = "default_units.json"
 PREFIX_KEY = "__prefixes__"
@@ -21,14 +24,14 @@ log = logging.getLogger()
 
 class Registry:
     """A factory class for units and quantities.  Broadly speaking, units and quantities created from
-    the same Registry object are compatible and can be converted if the dimensionality is the same."""
+    the same Registry object are compatible and can be converted if the dimensionality is the same.
+    """
 
     Quantity = pintless.quantity.Quantity
 
     def __init__(
         self, definition_filename: Optional[str] = None, link_to_registry: bool = True
     ):
-
         self.link_to_registry = link_to_registry
 
         if definition_filename is None:
@@ -56,7 +59,6 @@ class Registry:
         del defs[PREFIX_KEY]
 
         for utype, units in defs.items():
-
             # Create a forward index for the unit type
             utype = f"[{utype}]"  # for compatibility, pint dimensions have brackets.
             self.units_for_utype[utype] = {}
@@ -64,7 +66,6 @@ class Registry:
             # For every unit, for every prefix, calculate a multiplier down to the 'base unit'
             # for that unit type
             for unit_name, multiplier in units.items():
-
                 # The first entry in the dict is the base type
                 if utype not in self.base_type_for_utype:
                     self.base_type_for_utype[utype] = unit_name
@@ -72,7 +73,9 @@ class Registry:
                 # handle compound types
                 if isinstance(multiplier, dict):
                     if not ("numerator" in multiplier or "denominator" in multiplier):
-                        raise ValueError(f"Missing numerator and/or denominator list for derived type '{unit_name}'")
+                        raise ValueError(
+                            f"Missing numerator and/or denominator list for derived type '{unit_name}'"
+                        )
 
                     numerator_list = (
                         multiplier["numerator"]
@@ -124,7 +127,9 @@ class Registry:
                 raise ValueError(f"No base unit defined for unit type {utype}")
 
         if DIMENSIONLESS_UNIT_NAME not in self.units:
-            raise AssertionError(f"A unit with name '{DIMENSIONLESS_UNIT_NAME}' must be defined")
+            raise AssertionError(
+                f"A unit with name '{DIMENSIONLESS_UNIT_NAME}' must be defined"
+            )
 
         self.dimensionless_unit = Unit(
             [],
@@ -216,6 +221,7 @@ class Registry:
         the need to resolve a full parse tree isn't there: we can simply
         walk through the operations left-to-right.
         """
+
         def type_for_token(token: str) -> Union[Unit, pintless.quantity.Quantity, str]:
             """Tokenise the string, returning a token."""
             if token in ("*", ""):
@@ -304,20 +310,26 @@ class Registry:
         # Clean up by moving remaining ops onto the output queue
         while len(ops) > 0:
             if ops[-1] == OPEN_EXPR_TOKEN:
-                raise ValueError("Parenthesis mismatch: found open expression token on the operator stack")
+                raise ValueError(
+                    "Parenthesis mismatch: found open expression token on the operator stack"
+                )
             output_queue.append(ops.pop())
 
         operands = []
         for op in output_queue:
             if op == DIVIDE_TOKEN:
                 if len(operands) < 2:
-                    raise ValueError(f"Expected two operands for divide operation but got {len(operands)}")
+                    raise ValueError(
+                        f"Expected two operands for divide operation but got {len(operands)}"
+                    )
                 b = operands.pop()
                 a = operands.pop()
                 operands.append(a / b)
             elif op == MULTIPLY_TOKEN:
                 if len(operands) < 2:
-                    raise ValueError(f"Expected two operands for divide operation but got {len(operands)}")
+                    raise ValueError(
+                        f"Expected two operands for divide operation but got {len(operands)}"
+                    )
                 b = operands.pop()
                 a = operands.pop()
                 operands.append(a * b)
@@ -325,6 +337,22 @@ class Registry:
                 operands.append(op)
 
         if len(operands) != 1:
-            raise ValueError(f"Incomplete expression: {unit_expr} --- some tokens remained after evaluation: {operands[1:]}")
+            raise ValueError(
+                f"Incomplete expression: {unit_expr} --- some tokens remained after evaluation: {operands[1:]}"
+            )
 
         return operands[0]
+
+    def __deepcopy__(self, memo):
+        def empty_copy(obj):
+            class Empty(obj.__class__):
+                def __init__(self):
+                    pass
+
+            new = Empty()
+            new.__class__ = obj.__class__
+            return new
+
+        result = empty_copy(self)
+        result.__dict__ = deepcopy(self.__dict__, memo)
+        return result

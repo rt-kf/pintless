@@ -1,9 +1,12 @@
 from __future__ import annotations
-from typing import Union, List, Tuple, Optional
+
+from copy import deepcopy
 from functools import lru_cache
+from typing import List, Optional, Tuple, Union
+
+import pintless.registry
 
 from .quantity import Quantity
-import pintless.registry
 
 ValidMagnitude = Union[int, float, complex]
 Numeric = Union[int, float]
@@ -60,6 +63,21 @@ class BaseUnit:
             and self.multiplier == __o.multiplier
         )
 
+    def __copy__(self):
+        result = self.__class__(
+            self.name, self.unit_type, self.base_unit, self.multiplier
+        )
+        return result
+
+    def __deepcopy__(self, memo):
+        result = self.__class__(
+            deepcopy(self.name, memo),
+            deepcopy(self.unit_type, memo),
+            deepcopy(self.base_unit, memo),
+            deepcopy(self.multiplier, memo),
+        )
+        return result
+
 
 class Unit:
     """
@@ -82,7 +100,6 @@ class Unit:
         dimensionless_unit: Optional[Unit] = None,
         alias: Optional[str] = None,
     ) -> None:
-
         self.registry = registry
         self.dimensionless_base_unit = dimensionless_base_unit
 
@@ -157,7 +174,6 @@ class Unit:
             u.unit_type == self.dimensionless_base_unit.unit_type
             for u in self.denominator_units
         ):
-
             if len(self.numerator_units) > 1:
                 self._name = f"({self._name})"
 
@@ -180,6 +196,7 @@ class Unit:
         the method returns two items: a conversion factor that operates in the same way
         as .conversion_factor(), and the resulting Unit instance itself.
         """
+
         def first_index(lst: List[BaseUnit], unit_type: str) -> Optional[int]:
             """Return the index of the first item out of lst that is of the unit type unit_type"""
             for i, u in enumerate(lst):
@@ -222,7 +239,9 @@ class Unit:
             # Find a unit with the correct type in the numerator and cancel it.
             index_to_cancel = first_index(new_numerator, denom_unit.unit_type)
             if index_to_cancel is not None:
-                conversion_factor *= new_numerator[index_to_cancel].conversion_factor(denom_unit)
+                conversion_factor *= new_numerator[index_to_cancel].conversion_factor(
+                    denom_unit
+                )
                 del new_numerator[index_to_cancel]
             else:
                 new_denominator.append(denom_unit)
@@ -265,21 +284,24 @@ class Unit:
         for base_unit_from, base_unit_to in zip(
             self.numerator_units, target_unit.numerator_units
         ):
-            numerator_conversion_factor *= base_unit_from.conversion_factor(base_unit_to)
+            numerator_conversion_factor *= base_unit_from.conversion_factor(
+                base_unit_to
+            )
 
         # Conversion factor for all the multiplied denominator items
         denominator_conversion_factor = 1
         for base_unit_from, base_unit_to in zip(
             self.denominator_units, target_unit.denominator_units
         ):
-            denominator_conversion_factor *= base_unit_from.conversion_factor(base_unit_to)
+            denominator_conversion_factor *= base_unit_from.conversion_factor(
+                base_unit_to
+            )
 
         conversion_factor = numerator_conversion_factor / denominator_conversion_factor
 
         return conversion_factor
 
     def __eq__(self, __o: object) -> bool:
-
         if (
             not isinstance(__o, Unit)
             or len(self.numerator_units) != len(__o.numerator_units)
@@ -364,3 +386,12 @@ class Unit:
             self.dimensionless_base_unit,
             self.registry,
         )
+
+    def __deepcopy__(self, memo):
+        result = self.__class__(
+            deepcopy(self.numerator_units, memo),
+            deepcopy(self.denominator_units, memo),
+            deepcopy(self.dimensionless_base_unit, memo),
+            deepcopy(self.registry, memo),
+        )
+        return result

@@ -1,6 +1,8 @@
 from __future__ import annotations
-from typing import Union, Any
+
 import math
+from copy import deepcopy
+from typing import Any, Union
 
 import pintless.unit as plu
 
@@ -18,7 +20,6 @@ class Quantity:
     """
 
     def __init__(self, magnitude: Any, unit: plu.Unit) -> None:
-
         if isinstance(unit, str):
             raise TypeError(
                 "Cannot instantiate a Quantity object using a string expression as a unit: use the unit registry to do this instead."
@@ -57,7 +58,9 @@ class Quantity:
 
         # This might happen if someone passes in a string containing numbers
         if not isinstance(target_unit, plu.Unit):
-            raise ValueError("Cannot convert to a non-unit type (this may happen if converting to a string expression with numbers in it)")
+            raise ValueError(
+                "Cannot convert to a non-unit type (this may happen if converting to a string expression with numbers in it)"
+            )
 
         conversion_factor = self.unit.conversion_factor(target_unit)
         if isinstance(self.magnitude, list):
@@ -75,7 +78,9 @@ class Quantity:
 
         # This might happen if someone passes in a string containing numbers
         if not isinstance(target_unit, plu.Unit):
-            raise ValueError("Cannot convert to a non-unit type (this may happen if converting to a string expression with numbers in it)")
+            raise ValueError(
+                "Cannot convert to a non-unit type (this may happen if converting to a string expression with numbers in it)"
+            )
 
         conversion_factor = self.unit.conversion_factor(target_unit)
         if isinstance(self.magnitude, list):
@@ -131,7 +136,6 @@ class Quantity:
 
     def __add__(self, __o: object) -> Quantity:
         if not isinstance(__o, Quantity):
-
             if __o == 0:
                 return self
 
@@ -152,7 +156,6 @@ class Quantity:
 
     def __sub__(self, __o: object) -> Quantity:
         if not isinstance(__o, Quantity):
-
             if __o == 0:
                 return self
 
@@ -315,3 +318,13 @@ class Quantity:
 
     def __repr__(self) -> str:
         return f"<Quantity({self.magnitude}, '{self.unit.name}')>"
+
+    def __copy__(self):
+        result = self.__class__(self.magnitude, self.unit)
+        return result
+
+    def __deepcopy__(self, memo):
+        result = self.__class__(
+            deepcopy(self.magnitude, memo), deepcopy(self.units, memo)
+        )
+        return result
